@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>StockQR — Inventario</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root {
+  --bg: #0c0d10; --bg2: #13141a; --bg3: #1a1c24; --bg4: #22242e;
+  --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+  --text: #f0ede8; --text2: #9a9590; --text3: #55524e;
+  --gold: #c9a84c; --gold2: #e8c97a; --gold-bg: rgba(201,168,76,0.12);
+  --green: #4caf82; --green-bg: rgba(76,175,130,0.12);
+  --red: #e05252; --red-bg: rgba(224,82,82,0.12);
+  --amber: #e09c3c; --amber-bg: rgba(224,156,60,0.12);
+  --nav-h: 64px; --topbar-h: 56px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { background: var(--bg); }
+body { font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--bg); min-height: 100vh; padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
+
+/* TOPBAR */
+.topbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: var(--topbar-h); position: sticky; top: 0; z-index: 100; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 32px; height: 32px; background: var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.brand-mark svg { width: 18px; height: 18px; fill: #0c0d10; }
+.brand-name { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+.brand-tag { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+.topbar-action { display: flex; gap: 8px; }
+
+/* BOTTOM NAV */
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); border-top: 1px solid var(--border); display: flex; height: var(--nav-h); padding-bottom: env(safe-area-inset-bottom); z-index: 200; }
+.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: var(--text3); font-size: 10px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.15s; padding: 8px 4px; }
+.nav-item svg { width: 22px; height: 22px; }
+.nav-item.active { color: var(--gold2); }
+.nav-item.active svg { filter: drop-shadow(0 0 6px rgba(201,168,76,0.4)); }
+
+/* PAGE */
+.page { padding: 16px; }
+
+/* METRICS */
+.metrics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.metric-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; }
+.metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--gold); opacity: 0.6; }
+.metric-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.metric-val { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+.metric-val.gold { color: var(--gold2); }
+.metric-val.green { color: var(--green); }
+.metric-sub { font-size: 10px; color: var(--text3); margin-top: 4px; }
+
+/* SECTION HEADER */
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; margin-top: 4px; }
+.section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); }
+
+/* SEARCH */
+.search-wrap { position: relative; margin-bottom: 12px; }
+.search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); }
+.search-input { width: 100%; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px 12px 42px; font-size: 15px; color: var(--text); font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; }
+.search-input:focus { border-color: var(--gold); }
+.search-input::placeholder { color: var(--text3); }
+
+/* PRODUCT CARDS */
+.product-list { display: flex; flex-direction: column; gap: 10px; }
+.product-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: border-color 0.15s; }
+.product-card.low { border-color: rgba(224,156,60,0.3); }
+.product-card.out { border-color: rgba(224,82,82,0.3); }
+.pc-main { padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; }
+.pc-icon { width: 40px; height: 40px; background: var(--gold-bg); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; border: 1px solid rgba(201,168,76,0.2); }
+.pc-info { flex: 1; min-width: 0; }
+.pc-name { font-weight: 600; font-size: 15px; line-height: 1.2; margin-bottom: 3px; }
+.pc-cat { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.pc-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pc-id { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--gold); background: var(--gold-bg); padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(201,168,76,0.2); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.badge-green { background: var(--green-bg); color: var(--green); }
+.badge-amber { background: var(--amber-bg); color: var(--amber); }
+.badge-red { background: var(--red-bg); color: var(--red); }
+.pc-price { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; color: var(--gold2); margin-left: auto; flex-shrink: 0; }
+
+/* STOCK BAR */
+.pc-stock-bar { padding: 0 16px 12px; }
+.stock-track { height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+.stock-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+
+/* CARD ACTIONS */
+.pc-actions { display: flex; border-top: 1px solid var(--border); }
+.pc-action-btn { flex: 1; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text2); background: none; border: none; cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+.pc-action-btn + .pc-action-btn { border-left: 1px solid var(--border); }
+.pc-action-btn:hover, .pc-action-btn:active { background: var(--bg3); color: var(--text); }
+.pc-action-btn.qr { color: var(--gold); }
+.pc-action-btn.del { color: var(--red); }
+
+/* FAB */
+.fab { position: fixed; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); right: 16px; width: 56px; height: 56px; background: var(--gold); color: #0c0d10; border: none; border-radius: 50%; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(201,168,76,0.4); z-index: 150; transition: transform 0.2s, box-shadow 0.2s; }
+.fab:active { transform: scale(0.94); }
+
+/* BOTTOM SHEET */
+.sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 300; display: none; opacity: 0; transition: opacity 0.25s; backdrop-filter: blur(3px); }
+.sheet-overlay.show { display: block; opacity: 1; }
+.sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); border-radius: 20px 20px 0 0; z-index: 301; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); max-height: 92vh; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+.sheet.show { transform: translateY(0); }
+.sheet-handle { width: 40px; height: 4px; background: var(--bg4); border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
+.sheet-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.sheet-title { font-size: 16px; font-weight: 700; }
+.sheet-close { width: 32px; height: 32px; background: var(--bg3); border: none; border-radius: 50%; color: var(--text2); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.sheet-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+
+/* FORM */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 6px; font-weight: 600; }
+.form-input { width: 100%; background: var(--bg3); border: 1px solid var(--border2); border-radius: 10px; padding: 13px 14px; font-size: 16px; color: var(--text); font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; }
+.form-input:focus { border-color: var(--gold); }
+.form-input::placeholder { color: var(--text3); }
+select.form-input option { background: var(--bg3); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* BUTTONS */
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 20px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; font-family: 'DM Sans', sans-serif; transition: all 0.15s; width: 100%; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--gold); color: #0c0d10; }
+.btn-ghost { background: var(--bg3); color: var(--text2); border: 1px solid var(--border2); }
+.btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid rgba(224,82,82,0.2); }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+
+/* QR MODAL */
+.qr-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 400; display: none; align-items: flex-end; justify-content: center; backdrop-filter: blur(4px); }
+.qr-modal-overlay.open { display: flex; }
+.qr-modal { background: var(--bg2); border-radius: 20px 20px 0 0; padding: 24px 24px calc(24px + env(safe-area-inset-bottom)); width: 100%; text-align: center; animation: slideUp 0.3s cubic-bezier(0.32,0.72,0,1); }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.qr-product-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.qr-product-id { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--gold); margin-bottom: 16px; }
+.qr-container { width: 180px; height: 180px; margin: 0 auto 16px; background: #fff; border-radius: 12px; padding: 12px; display: flex; align-items: center; justify-content: center; }
+.qr-details { font-size: 13px; color: var(--text2); margin-bottom: 20px; line-height: 1.7; }
+.qr-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* EMPTY STATE */
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text3); }
+.empty-state-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+.empty-state-text { font-size: 15px; line-height: 1.5; }
+
+/* TOAST */
+.toast { position: fixed; top: calc(var(--topbar-h) + 10px); left: 16px; right: 16px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 14px 18px; font-size: 14px; color: var(--text); z-index: 9999; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); animation: toastIn 0.25s ease; pointer-events: none; }
+.toast.success::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.toast.error::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="5" height="5"/><rect x="10" y="1" width="5" height="5"/><rect x="1" y="10" width="5" height="5"/><rect x="2" y="2" width="3" height="3" fill="#0c0d10"/><rect x="11" y="2" width="3" height="3" fill="#0c0d10"/><rect x="2" y="11" width="3" height="3" fill="#0c0d10"/><rect x="10" y="10" width="2" height="2"/><rect x="13" y="10" width="2" height="2"/><rect x="10" y="13" width="2" height="2"/><rect x="13" y="13" width="2" height="2"/></svg></div>
+    <div><div class="brand-name">StockQR</div><div class="brand-tag">Inventario</div></div>
+  </div>
+  <div class="topbar-action">
+    <button class="btn-ghost" style="padding:8px 12px;border-radius:8px;font-size:12px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="exportCSV()">CSV</button>
+  </div>
+</div>
+
+<div class="page">
+  <!-- METRICS -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-label">Productos</div>
+      <div class="metric-val" id="m-total">0</div>
+      <div class="metric-sub">lotes activos</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Stock total</div>
+      <div class="metric-val green" id="m-stock">0</div>
+      <div class="metric-sub">unidades</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Valor inventario</div>
+      <div class="metric-val gold" id="m-valor">RD$0</div>
+      <div class="metric-sub">a precio de venta</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Stock bajo</div>
+      <div class="metric-val" id="m-low" style="color:var(--amber)">0</div>
+      <div class="metric-sub">necesitan reposición</div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-wrap">
+    <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--text3)" stroke-width="1.5"><circle cx="6.5" cy="6.5" r="5"/><path d="M11.5 11.5L14 14" stroke-linecap="round"/></svg>
+    <input class="search-input" id="search" type="text" placeholder="Buscar producto..." oninput="renderList()">
+  </div>
+
+  <!-- LIST -->
+  <div class="section-head">
+    <span class="section-title">Productos</span>
+    <span id="count-label" style="font-size:12px;color:var(--text3);font-family:'DM Mono',monospace;"></span>
+  </div>
+  <div class="product-list" id="product-list"></div>
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="openAddSheet()" title="Agregar producto">+</button>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <a href="inventario.html" class="nav-item active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    Inventario
+  </a>
+  <a href="facturacion.html" class="nav-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Facturar
+  </a>
+  <a href="historial.html" class="nav-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Historial
+  </a>
+</nav>
+
+<!-- ADD SHEET -->
+<div class="sheet-overlay" id="add-overlay" onclick="closeAddSheet()"></div>
+<div class="sheet" id="add-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <span class="sheet-title" id="sheet-title">Agregar producto</span>
+    <button class="sheet-close" onclick="closeAddSheet()">✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="form-group">
+      <label class="form-label">Nombre del producto *</label>
+      <input class="form-input" id="f-name" type="text" placeholder="ej. iPhone 14 Pro" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Categoría</label>
+      <select class="form-input" id="f-cat">
+        <option value="Electrónica">Electrónica</option>
+        <option value="Accesorios">Accesorios</option>
+        <option value="Ropa">Ropa</option>
+        <option value="Alimentos">Alimentos</option>
+        <option value="Hogar">Hogar</option>
+        <option value="Salud">Salud</option>
+        <option value="Otro">Otro</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Cantidad *</label>
+        <input class="form-input" id="f-qty" type="number" placeholder="0" min="1" inputmode="numeric">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Stock mínimo</label>
+        <input class="form-input" id="f-min" type="number" placeholder="2" min="0" inputmode="numeric" value="2">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Precio venta *</label>
+        <input class="form-input" id="f-price" type="number" placeholder="0.00" min="0" inputmode="decimal">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Costo</label>
+        <input class="form-input" id="f-cost" type="number" placeholder="0.00" min="0" inputmode="decimal">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descripción</label>
+      <input class="form-input" id="f-desc" type="text" placeholder="Notas opcionales...">
+    </div>
+    <div style="height:8px;"></div>
+    <button class="btn btn-primary" onclick="addLot()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Guardar y generar QR
+    </button>
+    <div style="height:8px;"></div>
+    <button class="btn btn-ghost" onclick="closeAddSheet()">Cancelar</button>
+    <div style="height:16px;"></div>
+  </div>
+</div>
+
+<!-- QR MODAL -->
+<div class="qr-modal-overlay" id="qr-modal">
+  <div class="qr-modal">
+    <div class="sheet-handle" style="margin:0 auto 16px;"></div>
+    <div class="qr-product-name" id="modal-name"></div>
+    <div class="qr-product-id" id="modal-id"></div>
+    <div class="qr-container"><div id="modal-qr-container"></div></div>
+    <div class="qr-details" id="modal-details"></div>
+    <div class="qr-actions">
+      <button class="btn btn-primary" style="padding:12px;" onclick="printQR()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimir QR
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function getInventory() { try { return JSON.parse(localStorage.getItem('sqr_inventory') || '[]'); } catch { return []; } }
+function saveInventory(d) { localStorage.setItem('sqr_inventory', JSON.stringify(d)); }
+
+let inventory = getInventory();
+let editingId = null;
+let currentQrLot = null;
+
+function genId(inv) {
+  let n = inv.length + 1;
+  while (inv.find(i => i.id === 'L' + String(n).padStart(3,'0'))) n++;
+  return 'L' + String(n).padStart(3,'0');
+}
+
+const CATEGORY_ICONS = { 'Electrónica':'📱','Accesorios':'🎧','Ropa':'👕','Alimentos':'🍎','Hogar':'🏠','Salud':'💊','Otro':'📦' };
+
+function renderMetrics() {
+  const total = inventory.length;
+  const stock = inventory.reduce((s,i) => s+i.qty, 0);
+  const valor = inventory.reduce((s,i) => s+(i.price*i.qty), 0);
+  const low = inventory.filter(i => i.qty <= i.minStock && i.qty > 0).length;
+  document.getElementById('m-total').textContent = total;
+  document.getElementById('m-stock').textContent = stock;
+  document.getElementById('m-valor').textContent = 'RD$' + (valor >= 1000 ? (valor/1000).toFixed(1)+'k' : valor.toLocaleString());
+  document.getElementById('m-low').textContent = low;
+}
+
+function renderList() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const filtered = inventory.filter(i =>
+    !q || i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
+  );
+  document.getElementById('count-label').textContent = filtered.length + ' / ' + inventory.length;
+  const el = document.getElementById('product-list');
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">${inventory.length === 0 ? 'No hay productos.<br>Toca + para agregar el primero.' : 'Sin resultados para "'+q+'"'}</div></div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(i => {
+    const pct = i.initialQty > 0 ? Math.min(100, Math.round(i.qty / i.initialQty * 100)) : 0;
+    const isLow = i.qty <= i.minStock && i.qty > 0;
+    const isOut = i.qty === 0;
+    const badgeClass = isOut ? 'badge-red' : isLow ? 'badge-amber' : 'badge-green';
+    const badgeText = isOut ? 'Sin stock' : isLow ? 'Stock bajo' : i.qty + ' uds';
+    const fillColor = isOut ? 'var(--red)' : isLow ? 'var(--amber)' : 'var(--green)';
+    const icon = CATEGORY_ICONS[i.category] || '📦';
+    return `<div class="product-card ${isOut?'out':isLow?'low':''}">
+      <div class="pc-main">
+        <div class="pc-icon">${icon}</div>
+        <div class="pc-info">
+          <div class="pc-name">${i.name}</div>
+          <div class="pc-cat">${i.category}${i.desc ? ' · ' + i.desc : ''}</div>
+          <div class="pc-row">
+            <span class="pc-id">${i.id}</span>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+          </div>
+        </div>
+        <div class="pc-price">RD$${i.price.toLocaleString()}</div>
+      </div>
+      <div class="pc-stock-bar">
+        <div class="stock-track"><div class="stock-fill" style="width:${pct}%;background:${fillColor};"></div></div>
+      </div>
+      <div class="pc-actions">
+        <button class="pc-action-btn qr" onclick="showQR('${i.id}')">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="5" height="5"/><rect x="10" y="1" width="5" height="5"/><rect x="1" y="10" width="5" height="5"/><rect x="2" y="2" width="3" height="3" fill="var(--bg2)"/><rect x="11" y="2" width="3" height="3" fill="var(--bg2)"/><rect x="2" y="11" width="3" height="3" fill="var(--bg2)"/><rect x="10" y="10" width="2" height="2"/><rect x="13" y="10" width="2" height="2"/><rect x="10" y="13" width="2" height="2"/><rect x="13" y="13" width="2" height="2"/></svg>
+          Ver QR
+        </button>
+        <button class="pc-action-btn" onclick="openEditSheet('${i.id}')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Editar
+        </button>
+        <button class="pc-action-btn del" onclick="deleteLot('${i.id}')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          Borrar
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAddSheet() {
+  editingId = null;
+  document.getElementById('sheet-title').textContent = 'Agregar producto';
+  clearForm();
+  document.getElementById('add-overlay').classList.add('show');
+  document.getElementById('add-sheet').classList.add('show');
+  setTimeout(() => document.getElementById('f-name').focus(), 350);
+}
+
+function openEditSheet(id) {
+  const lot = inventory.find(i => i.id === id);
+  if (!lot) return;
+  editingId = id;
+  document.getElementById('sheet-title').textContent = 'Editar · ' + lot.id;
+  document.getElementById('f-name').value = lot.name;
+  document.getElementById('f-cat').value = lot.category;
+  document.getElementById('f-qty').value = lot.qty;
+  document.getElementById('f-min').value = lot.minStock;
+  document.getElementById('f-price').value = lot.price;
+  document.getElementById('f-cost').value = lot.cost || '';
+  document.getElementById('f-desc').value = lot.desc || '';
+  document.getElementById('add-overlay').classList.add('show');
+  document.getElementById('add-sheet').classList.add('show');
+}
+
+function closeAddSheet() {
+  document.getElementById('add-overlay').classList.remove('show');
+  document.getElementById('add-sheet').classList.remove('show');
+  editingId = null;
+}
+
+function clearForm() {
+  ['f-name','f-qty','f-price','f-cost','f-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-min').value = '2';
+  document.getElementById('f-cat').value = 'Electrónica';
+}
+
+function addLot() {
+  const name = document.getElementById('f-name').value.trim();
+  const qty = parseInt(document.getElementById('f-qty').value);
+  const price = parseFloat(document.getElementById('f-price').value);
+  const cost = parseFloat(document.getElementById('f-cost').value) || 0;
+  const minStock = parseInt(document.getElementById('f-min').value) || 2;
+  const cat = document.getElementById('f-cat').value;
+  const desc = document.getElementById('f-desc').value.trim();
+  if (!name) { toast('Ingresa el nombre del producto', 'error'); return; }
+  if (!qty || qty < 1) { toast('La cantidad debe ser mayor a 0', 'error'); return; }
+  if (isNaN(price) || price < 0) { toast('Ingresa un precio válido', 'error'); return; }
+
+  if (editingId) {
+    const lot = inventory.find(i => i.id === editingId);
+    if (lot) { lot.name = name; lot.category = cat; lot.qty = qty; lot.price = price; lot.cost = cost; lot.minStock = minStock; lot.desc = desc; if (qty > lot.initialQty) lot.initialQty = qty; }
+    toast('Producto actualizado ✓');
+  } else {
+    const id = genId(inventory);
+    inventory.push({ id, name, category: cat, qty, price, cost, minStock, desc, initialQty: qty, created: new Date().toISOString().split('T')[0] });
+    toast(`Lote ${id} creado con QR ✓`);
+  }
+  saveInventory(inventory);
+  closeAddSheet();
+  renderList();
+  renderMetrics();
+}
+
+function deleteLot(id) {
+  const lot = inventory.find(i => i.id === id);
+  if (!confirm(`¿Eliminar "${lot?.name || id}"?`)) return;
+  inventory = inventory.filter(i => i.id !== id);
+  saveInventory(inventory);
+  renderList();
+  renderMetrics();
+  toast('Lote eliminado');
+}
+
+function showQR(id) {
+  const lot = inventory.find(i => i.id === id);
+  if (!lot) return;
+  currentQrLot = lot;
+  document.getElementById('modal-name').textContent = lot.name;
+  document.getElementById('modal-id').textContent = `${lot.id} · ${lot.category}`;
+  document.getElementById('modal-details').innerHTML = `Stock: <strong style="color:var(--green)">${lot.qty} uds</strong> &nbsp;·&nbsp; Precio: <strong style="color:var(--gold2)">RD$ ${lot.price.toLocaleString()}</strong>`;
+  const c = document.getElementById('modal-qr-container');
+  c.innerHTML = '';
+  new QRCode(c, { text: lot.id, width: 156, height: 156, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+  document.getElementById('qr-modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('qr-modal').classList.remove('open'); }
+
+function printQR() {
+  if (!currentQrLot) return;
+  const qrEl = document.querySelector('#modal-qr-container canvas') || document.querySelector('#modal-qr-container img');
+  let qrSrc = qrEl?.tagName === 'CANVAS' ? qrEl.toDataURL() : qrEl?.src || '';
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>QR ${currentQrLot.id}</title><style>body{font-family:Georgia,serif;text-align:center;padding:40px;background:#fff}h2{font-size:20px;margin:0 0 4px}.code{font-family:monospace;font-size:15px;letter-spacing:.1em;color:#c9a84c;margin-bottom:16px}img{width:200px;height:200px;display:block;margin:0 auto 14px}.info{font-size:13px;color:#666;line-height:1.8}@media print{button{display:none}}</style></head><body><h2>${currentQrLot.name}</h2><div class="code">${currentQrLot.id}</div>${qrSrc?`<img src="${qrSrc}"/>`:''}<div class="info">${currentQrLot.category} · RD$ ${currentQrLot.price.toLocaleString()}<br>Stock: ${currentQrLot.qty} unidades</div><br><button onclick="window.print()">Imprimir</button></body></html>`);
+  win.document.close();
+}
+
+function exportCSV() {
+  const headers = ['ID','Nombre','Categoría','Stock','Precio','Costo','Creado'];
+  const rows = inventory.map(i => [i.id,`"${i.name}"`,i.category,i.qty,i.price,i.cost||0,i.created]);
+  const csv = [headers,...rows].map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = 'inventario-stockqr.csv'; a.click();
+  toast('CSV exportado');
+}
+
+function toast(msg, type='success') {
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t = document.createElement('div');
+  t.className = `toast ${type}`; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+renderMetrics();
+renderList();
+</script>
+</body>
+</html>
